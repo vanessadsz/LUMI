@@ -1,0 +1,468 @@
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+/* ===== COLOURS ===== */
+:root {
+    --background: #FBF8FC;
+    --white: #FFFFFF;
+    --pink: #F8EAF0;
+    --lavender: #F0E8F8;
+    --lavender-accent: #C5AFD9;
+    --lavender-dark: #8F77AC;
+    --text: #453950;
+    --muted: #766780;
+    --border: #EDE4F1;
+    --progress-fill: #5a3e94;
+}
+
+/* ===== PAGE ===== */
+.stApp {
+    background: var(--background);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+}
+
+.stApp .block-container {
+    width: 100%;
+    max-width: 1400px;
+    padding: 2.5rem clamp(1rem, 3vw, 2.5rem) 3rem !important;
+}
+
+h1, h2, h3 {
+    color: var(--text);
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: -0.035em;
+}
+
+p, label, .stCaption {
+    color: var(--muted);
+}
+
+hr {
+    border-color: var(--border);
+}
+
+/* ===== BRAND / APP NAME ===== */
+.brand {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow: visible;
+    margin: 0.5rem 0 1.5rem;
+    padding: 4px 0;
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.brand span {
+    line-height: 1.5;
+}
+
+.brand span:first-child {
+    display: inline-block;
+    background: var(--lavender-accent);
+    color: #FFFFFF;
+    border-radius: 12px;
+    padding: 5px 12px;
+    margin-right: 4px;
+}
+
+/* ===== WELCOME BANNER ===== */
+.hero {
+    background: linear-gradient(115deg, #F5EAF8, #FBEAF0);
+    border: 1px solid #EDE0F0;
+    border-radius: 22px;
+    padding: clamp(22px, 3vw, 34px);
+    margin: 22px 0 28px;
+}
+
+.hero small {
+    color: var(--lavender-dark);
+    letter-spacing: 2px;
+    font-weight: 700;
+}
+
+.hero h1 {
+    color: var(--text);
+    font-size: clamp(1.7rem, 3.5vw, 2.6rem);
+    margin: 10px 0;
+}
+
+.hero p {
+    color: #756580;
+    margin-bottom: 0;
+    line-height: 1.7;
+}
+
+/* ===== DASHBOARD METRICS ===== */
+div[data-testid="stMetric"] {
+    min-width: 0;
+    background: var(--white);
+    border: 1px solid var(--border);
+    padding: 18px;
+    border-radius: 16px;
+    box-shadow: 0 3px 12px rgba(91, 66, 108, 0.05);
+}
+
+[data-testid="stMetricLabel"] {
+    color: #655270 !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #493256 !important;
+    font-family: 'Manrope', sans-serif;
+    font-size: 2rem !important;
+    font-weight: 800 !important;
+}
+
+[data-testid="stMetricDelta"] {
+    color: #655270 !important;
+}
+
+/* ===== TASK AND PROJECT CARDS ===== */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 4px;
+    box-shadow: 0 3px 12px rgba(91, 66, 108, 0.035);
+}
+
+/* ===== NAVIGATION TABS ===== */
+.stTabs [data-baseweb="tab-list"] {
+    display: flex !important;
+    justify-content: flex-end !important;
+    flex-wrap: wrap !important;
+    gap: 6px;
+    background: transparent;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.stTabs [data-baseweb="tab"] {
+    color: var(--muted) !important;
+    background: transparent !important;
+    border-radius: 10px 10px 0 0;
+    padding: 11px 14px;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    background: #F7F0FA !important;
+    color: var(--text) !important;
+}
+
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+    background: #EDE2F5 !important;
+    color: #493256 !important;
+}
+
+.stTabs [data-baseweb="tab-highlight"] {
+    background: var(--lavender-dark) !important;
+    height: 3px !important;
+}
+
+.stTabs [data-baseweb="tab-border"] {
+    background: var(--border) !important;
+}
+
+/* ===== INPUTS ===== */
+.stTextInput input,
+.stTextArea textarea,
+.stDateInput input,
+.stTimeInput input,
+.stSelectbox [data-baseweb="select"] > div {
+    background: #FFFFFF !important;
+    color: var(--text) !important;
+    border-color: #D9C9E4 !important;
+    border-radius: 10px !important;
+}
+
+.stTextInput input:focus,
+.stTextArea textarea:focus {
+    border-color: var(--lavender-dark) !important;
+    box-shadow: 0 0 0 1px var(--lavender-dark) !important;
+}
+/* ===== BUTTONS ===== */
+.stButton > button,
+.stFormSubmitButton > button {
+    min-height: 44px !important;
+    padding: 8px 16px !important;
+    border-radius: 12px !important;
+    background: #B99AD8 !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    border: 1px solid #9873BE !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 5px rgba(82, 54, 104, 0.12);
+    transition: background-color 0.2s ease;
+}
+
+/* Force nested button text to black */
+.stButton > button *,
+.stFormSubmitButton > button * {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+}
+
+.stButton > button:hover,
+.stFormSubmitButton > button:hover {
+    background: #A783CB !important;
+    border-color: #805CA8 !important;
+}
+
+.stButton > button:focus-visible,
+.stFormSubmitButton > button:focus-visible {
+    outline: 3px solid #765096 !important;
+    outline-offset: 3px !important;
+}
+
+/* ===== CHECKBOXES ===== */
+.stCheckbox label {
+    color: var(--text) !important;
+}
+
+/* ===== PROGRESS BAR ===== */
+
+/* Outer track */
+div[data-testid="stProgress"] [data-testid="stProgressBar"] {
+    height: 18px !important;
+    border-radius: 999px !important;
+    overflow: hidden !important;
+    background: #E8DFF3 !important;
+    border: none !important;
+}
+
+/* Filled portion */
+div[data-testid="stProgress"] [data-testid="stProgressBar"] > div {
+    height: 100% !important;
+    border-radius: 999px !important;
+    background: var(--progress-fill) !important;
+    transition: width 0.4s ease-in-out;
+}
+
+/* Percentage text: readable and never clipped */
+div[data-testid="stProgress"] [data-testid="stMarkdownContainer"] {
+    overflow: visible !important;
+    padding: 4px 0 8px !important;
+}
+
+div[data-testid="stProgress"] [data-testid="stMarkdownContainer"] p {
+    color: #493256 !important;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    line-height: 1.7 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    white-space: normal !important;
+}
+
+/* ===== SECTION HEADINGS ===== */
+.section-title {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 750;
+    margin: 24px 0 7px;
+    color: var(--text);
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.task-title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+/* ===== PRIORITY LABELS ===== */
+.pill {
+    display: inline-block;
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.high {
+    background: #F9E5EA;
+    color: #93465E;
+}
+
+.medium {
+    background: #FBF0D9;
+    color: #806127;
+}
+
+.low {
+    background: #E5F2EA;
+    color: #3F7055;
+}
+
+.completed-tag {
+    color: #477D5B;
+}
+
+/* ===== ALERTS ===== */
+div[data-testid="stAlert"] {
+    border-radius: 12px;
+}
+
+/* ===== TABLET ===== */
+@media (max-width: 900px) {
+    .stApp .block-container {
+        padding: 1.5rem 1.25rem 2rem !important;
+    }
+
+    div[data-testid="stMetric"] {
+        padding: 14px;
+    }
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 640px) {
+    .stApp .block-container {
+        padding: 1.25rem 0.75rem 1.5rem !important;
+    }
+
+    .brand {
+        font-size: 1.35rem;
+    }
+
+    .hero {
+        padding: 20px;
+        margin: 16px 0 20px;
+        border-radius: 16px;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        justify-content: flex-start !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        padding: 9px 10px;
+        font-size: 0.82rem;
+    }
+
+    div[data-testid="stMetric"] {
+        padding: 12px;
+        border-radius: 12px;
+    }
+
+    .section-title {
+        margin-top: 20px;
+    }
+}
+
+/* ===== FIX DARK TASK BOARD INPUTS ===== */
+
+/* Date, time, text and number input backgrounds */
+.stApp div[data-baseweb="input"],
+.stApp div[data-baseweb="input"] > div,
+.stApp div[data-baseweb="base-input"],
+.stApp div[data-baseweb="base-input"] > div,
+.stApp input,
+.stApp textarea {
+    background-color: #FFFFFF !important;
+    color: #453950 !important;
+    -webkit-text-fill-color: #453950 !important;
+    border-color: #D9C9E4 !important;
+}
+
+/* Project and filter dropdowns */
+.stApp div[data-baseweb="select"] > div {
+    background-color: #FFFFFF !important;
+    border-color: #D9C9E4 !important;
+    color: #453950 !important;
+}
+
+/* Selected dropdown value */
+.stApp div[data-baseweb="select"] span,
+.stApp div[data-baseweb="select"] input {
+    color: #453950 !important;
+    -webkit-text-fill-color: #453950 !important;
+}
+
+/* Keep input icons visible */
+.stApp div[data-baseweb="select"] svg {
+    fill: #766780 !important;
+    color: #766780 !important;
+}
+
+/* Task board form labels */
+.stApp [data-testid="stDateInput"] label,
+.stApp [data-testid="stTimeInput"] label,
+.stApp [data-testid="stSelectbox"] label {
+    color: #766780 !important;
+}
+
+/* ===== LUMI: FORCE LIGHT TASK BOARD WIDGETS ===== */
+
+/* Date picker and time picker */
+.stApp [data-testid="stDateInput"] div[data-baseweb="input"],
+.stApp [data-testid="stDateInput"] div[data-baseweb="input"] > div,
+.stApp [data-testid="stTimeInput"] div[data-baseweb="input"],
+.stApp [data-testid="stTimeInput"] div[data-baseweb="input"] > div,
+.stApp [data-testid="stNumberInput"] div[data-baseweb="input"],
+.stApp [data-testid="stNumberInput"] div[data-baseweb="input"] > div {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    border-color: #D9C9E4 !important;
+}
+
+/* Text displayed inside date and time fields */
+.stApp [data-testid="stDateInput"] input,
+.stApp [data-testid="stTimeInput"] input,
+.stApp [data-testid="stNumberInput"] input {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #453950 !important;
+    -webkit-text-fill-color: #453950 !important;
+    border: none !important;
+}
+
+/* Project and filter dropdowns */
+.stApp [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    border-color: #D9C9E4 !important;
+}
+
+/* Dropdown text */
+.stApp [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+.stApp [data-testid="stSelectbox"] div[data-baseweb="select"] input {
+    color: #453950 !important;
+    -webkit-text-fill-color: #453950 !important;
+}
+
+/* Input borders and rounded corners */
+.stApp [data-testid="stDateInput"] div[data-baseweb="input"],
+.stApp [data-testid="stTimeInput"] div[data-baseweb="input"],
+.stApp [data-testid="stNumberInput"] div[data-baseweb="input"],
+.stApp [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+    border: 1px solid #D9C9E4 !important;
+    border-radius: 10px !important;
+}
+
+/* Calendar and clock icons */
+.stApp [data-testid="stDateInput"] svg,
+.stApp [data-testid="stTimeInput"] svg,
+.stApp [data-testid="stSelectbox"] svg {
+    color: #766780 !important;
+    fill: #766780 !important;
+}
