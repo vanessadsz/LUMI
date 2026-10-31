@@ -149,8 +149,21 @@ def update_dashboard_task(index):
 
 # ---------------- AI INTEGRATION ----------------
 
+GEMINI_MODEL = "gemini-3.8-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "openrouter/free"
+
+
+def get_gemini_api_key():
+    """Retrieve Gemini API key from Streamlit secrets or environment variables."""
+    try:
+        key = st.secrets.get("GEMINI_API_KEY")
+        if key:
+            return str(key).strip().lstrip("-")
+    except Exception:
+        pass
+    return os.environ.get("GEMINI_API_KEY", "").strip().lstrip("-")
 
 
 def get_openrouter_api_key():
@@ -266,11 +279,64 @@ def parse_tasks_locally(description):
     return tasks
 
 
-def organize_tasks(description):
-    api_key = get_openrouter_api_key()
-    if not api_key:
-        return parse_tasks_locally(description)
+def clean_parsed_task_list(result):
+    """Normalize and validate a list of raw task dicts from an AI model."""
+    if not isinstance(result, list):
+        return []
 
+    cleaned = []
+    for item in result:
+        if not isinstance(item, dict):
+            continue
+
+        name = str(item.get("task") or "").strip()
+        priority = str(item.get("priority") or "Medium").title()
+        raw_deadline = item.get("deadline")
+        deadline = str(raw_deadline).strip() if raw_deadline else "Not specified"
+        date_value = item.get("due_date")
+
+        if not name:
+            continue
+
+        if priority not in ["High", "Medium", "Low"]:
+            priority = "Medium"
+
+        parsed_date = None
+        if date_value:
+            try:
+                parsed_date = dt.date.fromisoformat(str(date_value))
+            except ValueError:
+                parsed_date = None
+
+        cleaned.append({
+            "task": name,
+            "priority": priority,
+            "deadline": deadline or "Not specified",
+            "due_date": parsed_date,
+            "project": "General",
+            "reminder_date": parsed_date,
+            "reminder_time": dt.time(9, 0),
+            "completed": False
+        })
+
+    return cleaned
+
+
+def extract_json_list(text):
+    """Strip markdown fences and parse a JSON array from model text."""
+    content = (text or "").strip()
+    content = re.sub(r"^```(?:json)?\s*", "", content)
+    content = re.sub(r"\s*```$", "", content)
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        match = re.search(r"\[.*\]", content, flags=re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+        return None
+
+
+def organize_tasks(description):
     today = dt.date.today().isoformat()
 
     prompt = f"""
@@ -304,83 +370,66 @@ User description:
 {description}
 """
 
-    try:
-        response = requests.post(
-            OPENROUTER_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2
-            },
-            timeout=30
-        )
-
-        if not response.ok:
-            return parse_tasks_locally(description)
-
-        payload = response.json()
-        choices = payload.get("choices") or []
-        if not choices or "message" not in choices[0]:
-            return parse_tasks_locally(description)
-
-        content = (choices[0]["message"].get("content") or "").strip()
-        content = re.sub(r"^```(?:json)?\s*", "", content)
-        content = re.sub(r"\s*```$", "", content)
-
+    # 1. Primary: Google Gemini API (gemini-3.8-flash)
+    gemini_key = get_gemini_api_key()
+    if gemini_key:
         try:
-            result = json.loads(content)
-        except json.JSONDecodeError:
-            match = re.search(r"\[.*\]", content, flags=re.DOTALL)
-            if not match:
-                return parse_tasks_locally(description)
-            result = json.loads(match.group(0))
+            response = requests.post(
+                f"{GEMINI_URL}?key={gemini_key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "responseMimeType": "application/json"
+                    }
+                },
+                timeout=30
+            )
+            if response.ok:
+                payload = response.json()
+                candidates = payload.get("candidates") or []
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts") or []
+                    text_out = "".join(p.get("text", "") for p in parts)
+                    parsed = extract_json_list(text_out)
+                    cleaned = clean_parsed_task_list(parsed)
+                    if cleaned:
+                        return cleaned
+        except Exception:
+            pass
 
-        if not isinstance(result, list):
-            return parse_tasks_locally(description)
+    # 2. Secondary: OpenRouter API
+    openrouter_key = get_openrouter_api_key()
+    if openrouter_key:
+        try:
+            response = requests.post(
+                OPENROUTER_URL,
+                headers={
+                    "Authorization": f"Bearer {openrouter_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2
+                },
+                timeout=30
+            )
+            if response.ok:
+                payload = response.json()
+                choices = payload.get("choices") or []
+                if choices and "message" in choices[0]:
+                    text_out = choices[0]["message"].get("content", "")
+                    parsed = extract_json_list(text_out)
+                    cleaned = clean_parsed_task_list(parsed)
+                    if cleaned:
+                        return cleaned
+        except Exception:
+            pass
 
-    except Exception:
-        return parse_tasks_locally(description)
-
-    cleaned = []
-
-    for item in result:
-        if not isinstance(item, dict):
-            continue
-
-        name = str(item.get("task", "")).strip()
-        priority = str(item.get("priority", "Medium")).title()
-        deadline = str(item.get("deadline", "Not specified")).strip()
-        date_value = item.get("due_date")
-
-        if not name:
-            continue
-
-        if priority not in ["High", "Medium", "Low"]:
-            priority = "Medium"
-
-        parsed_date = None
-        if date_value:
-            try:
-                parsed_date = dt.date.fromisoformat(str(date_value))
-            except ValueError:
-                parsed_date = None
-
-        cleaned.append({
-            "task": name,
-            "priority": priority,
-            "deadline": deadline or "Not specified",
-            "due_date": parsed_date,
-            "project": "General",
-            "reminder_date": parsed_date,
-            "reminder_time": dt.time(9, 0),
-            "completed": False
-        })
-
-    return cleaned or parse_tasks_locally(description)
+    # 3. Fallback: Local NLP Task Parser
+    return parse_tasks_locally(description)
 
 
 # ---------------- HEADER ----------------
