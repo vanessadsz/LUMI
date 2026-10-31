@@ -1,4 +1,4 @@
-# ✦ LUMI / FOLIO — Editorial AI Task Planner
+# ✦ LUMI — Editorial AI Task Planner
 
 **Lumi** is a quiet, high-density, AI-assisted task and project planner built with **Python**, **Streamlit**, **SQLite**, and **OpenRouter AI**, styled with the **Editorial Parchment** warm light-mode-first design system.
 
@@ -83,3 +83,4 @@ streamlit run app.py
 ```
 
 The app will open in your browser at `http://localhost:8501`.
+
