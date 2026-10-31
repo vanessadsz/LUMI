@@ -1,6 +1,7 @@
-
+import os
 import json
 import re
+import html
 import datetime as dt
 import requests
 import streamlit as st
@@ -10,7 +11,7 @@ import sqlite3
 # ---------------- PAGE CONFIG ----------------
 
 st.set_page_config(
-    page_title="Lumi | AI Planner",
+    page_title="Lumi | Editorial AI Planner",
     page_icon="✦",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -20,10 +21,11 @@ st.set_page_config(
 
 css_file = Path(__file__).parent / "style.css"
 
-st.markdown(
-    f"<style>{css_file.read_text(encoding='utf-8')}</style>",
-    unsafe_allow_html=True
-)
+if css_file.exists():
+    st.markdown(
+        f"<style>{css_file.read_text(encoding='utf-8')}</style>",
+        unsafe_allow_html=True
+    )
 
 
 # ---------------- PERMANENT STORAGE ----------------
@@ -92,7 +94,10 @@ def load_data():
         ).fetchone()
 
     if row:
-        return json.loads(row[0], object_hook=json_decode)
+        try:
+            return json.loads(row[0], object_hook=json_decode)
+        except Exception:
+            pass
 
     return {
         "tasks": [],
@@ -105,9 +110,9 @@ def load_data():
 if "storage_initialized" not in st.session_state:
     if "tasks" not in st.session_state:
         saved_data = load_data()
-        st.session_state.tasks = saved_data["tasks"]
-        st.session_state.projects = saved_data["projects"]
-        st.session_state.ai_tasks = saved_data["ai_tasks"]
+        st.session_state.tasks = saved_data.get("tasks", [])
+        st.session_state.projects = saved_data.get("projects", ["General"])
+        st.session_state.ai_tasks = saved_data.get("ai_tasks", [])
     else:
         # Preserve tasks already present in the current session.
         st.session_state.setdefault("ai_tasks", [])
@@ -136,8 +141,9 @@ for item in st.session_state.tasks:
 
 def update_dashboard_task(index):
     key = f"dashboard_done_{index}"
-    st.session_state.tasks[index]["completed"] = st.session_state[key]
-    save_data()
+    if 0 <= index < len(st.session_state.tasks) and key in st.session_state:
+        st.session_state.tasks[index]["completed"] = st.session_state[key]
+        save_data()
 
 
 # ---------------- AI INTEGRATION ----------------
@@ -146,8 +152,25 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "openrouter/free"
 
 
+def get_openrouter_api_key():
+    """Retrieve OpenRouter API key from Streamlit secrets or environment variables."""
+    try:
+        key = st.secrets.get("OPENROUTER_API_KEY")
+        if key:
+            return str(key).strip()
+    except Exception:
+        pass
+    return os.environ.get("OPENROUTER_API_KEY", "").strip()
+
+
 def organize_tasks(description):
-    api_key = st.secrets["OPENROUTER_API_KEY"]
+    api_key = get_openrouter_api_key()
+    if not api_key:
+        raise RuntimeError(
+            "Missing OPENROUTER_API_KEY. Add it to .streamlit/secrets.toml "
+            "or set it as an environment variable."
+        )
+
     today = dt.date.today().isoformat()
 
     prompt = f"""
@@ -201,12 +224,23 @@ User description:
             f"{response.text[:400]}"
         )
 
-    content = response.json()["choices"][0]["message"]["content"]
-    content = content.strip()
+    payload = response.json()
+    choices = payload.get("choices") or []
+    if not choices or "message" not in choices[0]:
+        raise RuntimeError("Unexpected response format from OpenRouter.")
+
+    content = (choices[0]["message"].get("content") or "").strip()
     content = re.sub(r"^```(?:json)?\s*", "", content)
     content = re.sub(r"\s*```$", "", content)
 
-    result = json.loads(content)
+    try:
+        result = json.loads(content)
+    except json.JSONDecodeError:
+        match = re.search(r"\[.*\]", content, flags=re.DOTALL)
+        if not match:
+            raise ValueError("Could not parse JSON task list from AI response.")
+        result = json.loads(match.group(0))
+
     if not isinstance(result, list):
         raise ValueError("The AI response was not a list.")
 
@@ -277,14 +311,14 @@ st.markdown("""
 
 tasks = st.session_state.tasks
 total = len(tasks)
-completed_count = sum(t["completed"] for t in tasks)
+completed_count = sum(bool(t.get("completed")) for t in tasks)
 pending_count = total - completed_count
 today = dt.date.today()
 
 upcoming_count = sum(
     isinstance(t.get("due_date"), dt.date)
     and t["due_date"] >= today
-    and not t["completed"]
+    and not t.get("completed")
     for t in tasks
 )
 
@@ -341,7 +375,7 @@ with tab_home:
             ai_submit = st.form_submit_button(
                 "✦ Organize with AI",
                 type="primary",
-                use_container_width=True
+                width="stretch"
             )
 
         if ai_submit:
@@ -351,6 +385,7 @@ with tab_home:
                 try:
                     with st.spinner("AI is planning your tasks..."):
                         st.session_state.ai_tasks = organize_tasks(description)
+                    save_data()
                     st.rerun()
                 except Exception as e:
                     st.error("The AI request failed.")
@@ -363,18 +398,20 @@ with tab_home:
         for n, item in enumerate(st.session_state.ai_tasks, start=1):
             with st.container(border=True):
                 st.markdown(f"**{n}. {item['task']}**")
+                priority_label = html.escape(str(item.get("priority", "Medium")))
+                deadline_label = html.escape(str(item.get("deadline", "Not specified")))
                 st.markdown(
-                    f'<span class="pill {item["priority"].lower()}">'
-                    f'{item["priority"]} priority</span>',
+                    f'<span class="pill {priority_label.lower()}">'
+                    f'{priority_label} priority</span>',
                     unsafe_allow_html=True
                 )
                 st.markdown(
-                    f'<div class="muted">Deadline: {item["deadline"]}</div>',
+                    f'<div class="muted">Deadline: {deadline_label}</div>',
                     unsafe_allow_html=True
                 )
 
         if st.button("＋ Add AI tasks to my list",
-                     type="primary", use_container_width=True):
+                     type="primary", width="stretch"):
             existing = {
                 t["task"].casefold() for t in st.session_state.tasks
             }
@@ -387,6 +424,7 @@ with tab_home:
                     added += 1
 
             st.session_state.ai_tasks = []
+            save_data()
             st.toast(f"Added {added} task(s)!")
             st.rerun()
 
@@ -428,7 +466,7 @@ with tab_home:
             manual_submit = st.form_submit_button(
                 "＋ Add task",
                 type="primary",
-                use_container_width=True
+                width="stretch"
             )
 
         if manual_submit:
@@ -450,6 +488,7 @@ with tab_home:
                     "reminder_time": new_reminder_time,
                     "completed": False
                 })
+                save_data()
                 st.toast("Task added!")
                 st.rerun()
 
@@ -477,14 +516,11 @@ with tab_home:
                 col_task, col_check = st.columns([5, 1])
 
                 with col_task:
+                    st.markdown(f"**{item['task']}**")
+                    priority_label = html.escape(str(item.get("priority", "Medium")))
                     st.markdown(
-                        f"**{item['task']}**"
-                    )
-                    st.markdown(
-                        f'<span class="pill '
-                        f'{item.get("priority", "Medium").lower()}">'
-                        f'{item.get("priority", "Medium")} priority'
-                        f'</span>',
+                        f'<span class="pill {priority_label.lower()}">'
+                        f'{priority_label} priority</span>',
                         unsafe_allow_html=True
                     )
                     st.caption(
@@ -493,18 +529,19 @@ with tab_home:
 
                 with col_check:
                     st.checkbox(
-    "Done",
-    value=item.get("completed", False),
-    key=f"dashboard_done_{i}",
-    on_change=update_dashboard_task,
-    args=(i,)
-)
+                        "Done",
+                        value=item.get("completed", False),
+                        key=f"dashboard_done_{i}",
+                        on_change=update_dashboard_task,
+                        args=(i,)
+                    )
+
     st.markdown('<div class="section-title">Your day at a glance</div>',
                 unsafe_allow_html=True)
 
     todays_tasks = [
         t for t in st.session_state.tasks
-        if t.get("due_date") == today and not t["completed"]
+        if t.get("due_date") == today and not t.get("completed")
     ]
 
     if todays_tasks:
@@ -542,7 +579,7 @@ with tab_calendar:
                 st.caption(
                     f"{item['priority']} priority · "
                     f"{item.get('project', 'General')} · "
-                    f"{'Completed' if item['completed'] else 'To do'}"
+                    f"{'Completed' if item.get('completed') else 'To do'}"
                 )
     else:
         st.info("No tasks with an editable calendar date on this day.")
@@ -573,13 +610,14 @@ with tab_projects:
             project_submit = st.form_submit_button(
                 "＋ Create project",
                 type="primary",
-                use_container_width=True
+                width="stretch"
             )
 
         if project_submit:
             clean_name = project_name.strip()
             if clean_name and clean_name not in st.session_state.projects:
                 st.session_state.projects.append(clean_name)
+                save_data()
                 st.success(f"Created project: {clean_name}")
                 st.rerun()
             elif clean_name:
@@ -595,7 +633,7 @@ with tab_projects:
             t for t in st.session_state.tasks
             if t.get("project", "General") == project
         ]
-        project_done = sum(t["completed"] for t in project_tasks)
+        project_done = sum(bool(t.get("completed")) for t in project_tasks)
 
         with st.container(border=True):
             st.markdown(f"**▧ {project}**")
@@ -607,7 +645,7 @@ with tab_projects:
 
                 for item in project_tasks:
                     st.write(
-                        f"{'✓' if item['completed'] else '○'} "
+                        f"{'✓' if item.get('completed') else '○'} "
                         f"{item['task']}"
                     )
 
@@ -640,8 +678,8 @@ with tab_board:
 
     visible_tasks.sort(
         key=lambda pair: (
-            pair[1]["completed"],
-            priority_order.get(pair[1]["priority"], 1),
+            pair[1].get("completed", False),
+            priority_order.get(pair[1].get("priority", "Medium"), 1),
             pair[0]
         )
     )
@@ -654,21 +692,23 @@ with tab_board:
     with done_col:
         st.markdown("### ✓ Completed")
 
-    todo_tasks = [(i, t) for i, t in visible_tasks if not t["completed"]]
-    done_tasks = [(i, t) for i, t in visible_tasks if t["completed"]]
+    todo_tasks = [(i, t) for i, t in visible_tasks if not t.get("completed")]
+    done_tasks = [(i, t) for i, t in visible_tasks if t.get("completed")]
 
     with todo_col:
         if not todo_tasks:
             st.info("Nothing to do here!")
         for i, item in todo_tasks:
             with st.container(border=True):
+                safe_title = html.escape(str(item["task"]))
+                priority_label = html.escape(str(item.get("priority", "Medium")))
                 st.markdown(
-                    f'<div class="task-title">{item["task"]}</div>',
+                    f'<div class="task-title">{safe_title}</div>',
                     unsafe_allow_html=True
                 )
                 st.markdown(
-                    f'<span class="pill {item["priority"].lower()}">'
-                    f'{item["priority"]} priority</span>',
+                    f'<span class="pill {priority_label.lower()}">'
+                    f'{priority_label} priority</span>',
                     unsafe_allow_html=True
                 )
                 st.caption(f"Project: {item.get('project', 'General')}")
@@ -679,10 +719,10 @@ with tab_board:
                     key=f"edit_due_{i}"
                 )
                 st.session_state.tasks[i]["due_date"] = edited_date
-                st.session_state.tasks[i]["deadline"] = (
-                    edited_date.strftime("%d %b %Y")
-                    if edited_date else "Not specified"
-                )
+                if edited_date:
+                    st.session_state.tasks[i]["deadline"] = edited_date.strftime("%d %b %Y")
+                elif isinstance(item.get("due_date"), dt.date):
+                    st.session_state.tasks[i]["deadline"] = "Not specified"
 
                 edited_project = st.selectbox(
                     "Project",
@@ -711,8 +751,9 @@ with tab_board:
                 st.session_state.tasks[i]["reminder_time"] = reminder_time
 
                 if st.button("✓ Mark complete", key=f"complete_{i}",
-                             type="primary", use_container_width=True):
+                             type="primary", width="stretch"):
                     st.session_state.tasks[i]["completed"] = True
+                    save_data()
                     st.rerun()
 
     with done_col:
@@ -722,15 +763,16 @@ with tab_board:
             with st.container(border=True):
                 st.markdown(f"**✓ {item['task']}**")
                 st.caption(
-                    f"{item['priority']} priority · "
+                    f"{item.get('priority', 'Medium')} priority · "
                     f"{item.get('project', 'General')}"
                 )
                 if st.button(
                     "↶ Reopen task",
                     key=f"reopen_{i}",
-                    use_container_width=True
+                    width="stretch"
                 ):
                     st.session_state.tasks[i]["completed"] = False
+                    save_data()
                     st.rerun()
 
     if visible_tasks:
@@ -747,6 +789,17 @@ with tab_board:
             if st.button("Delete selected task"):
                 delete_index = delete_options[selected_delete]
                 st.session_state.tasks.pop(delete_index)
+                # Clear indexed widget state keys so shifted tasks load cleanly
+                for k in list(st.session_state.keys()):
+                    if k.startswith((
+                        "edit_due_",
+                        "edit_project_",
+                        "edit_reminder_date_",
+                        "edit_reminder_time_",
+                        "dashboard_done_",
+                    )):
+                        del st.session_state[k]
+                save_data()
                 st.rerun()
 
 
@@ -802,7 +855,7 @@ with tab_reminders:
                         f"Deadline: {due_date.strftime('%d %b %Y')}"
                     )
 
-                if item["completed"]:
+                if item.get("completed"):
                     st.caption("✓ Completed")
                 elif reminder_date and reminder_date < today:
                     st.warning("Reminder date has passed.")
