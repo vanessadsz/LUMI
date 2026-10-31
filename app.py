@@ -250,19 +250,25 @@ User description:
 
 # ---------------- HEADER ----------------
 
-st.markdown(
-    '<div class="brand"><span>✦</span> LUMI '
-    '<span style="background:transparent;color:#aaa8ca;'
-    'font-size:.8rem;font-weight:500">AI PRODUCTIVITY SPACE</span></div>',
-    unsafe_allow_html=True
-)
+st.markdown("""
+<div class="brand">
+    <div class="brand-left">
+        <span class="brand-mark">✦</span>
+        <span>LUMI / FOLIO</span>
+        <span style="color:#A5A79B;font-size:13px;font-weight:510;margin-left:4px">
+            AI PRODUCTIVITY WORKSPACE
+        </span>
+    </div>
+    <span class="brand-meta">EDITORIAL PARCHMENT v2.0</span>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("""
 <div class="hero">
-    <small>YOUR DAY, YOUR WAY</small>
+    <div class="hero-pill">✦ YOUR DAY, ENGINEERED WITH CLARITY →</div>
     <h1>Make room for what matters.</h1>
-    <p>Plan your projects, organize your tasks, and keep your next
-    deadline in sight — with a little help from AI.</p>
+    <p>Plan your projects, structure your tasks, and keep your next
+    deadline in sight — in a quiet, high-density editorial workspace.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -816,9 +822,9 @@ save_data()
 
 # ---------------- FOOTER ----------------
 
-st.markdown("---")
-st.markdown(
-    '<div style="text-align:center;color:#85849f;font-size:.8rem">'
-    'LUMI · Built with Python, Streamlit & OpenRouter AI</div>',
-    unsafe_allow_html=True
-)
+st.markdown("""
+<div class="ep-footer">
+    <div class="ep-footer-title">LUMI / FOLIO · EDITORIAL PARCHMENT SYSTEM</div>
+    <div class="ep-footer-copy">Built with Python, Streamlit & OpenRouter AI · Cream, Burgundy & Sage</div>
+</div>
+""", unsafe_allow_html=True)
