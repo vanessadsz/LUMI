@@ -164,13 +164,112 @@ def get_openrouter_api_key():
     return os.environ.get("OPENROUTER_API_KEY", "").strip()
 
 
+def parse_tasks_locally(description):
+    """Smart local natural-language task parser used when AI API is unavailable or key is invalid."""
+    today = dt.date.today()
+    raw_parts = re.split(
+        r"[\n;•]+|(?:\s*,\s*(?:and\s+)?)|(?:\s+and\s+(?=(?:i\s+have|i\s+need|finish|complete|study|clean|submit|prepare|call|buy|write|read|work|do|make|fix|review|attend|schedule|pay|send|create|update|check|a\s+|an\s+|the\s+)))",
+        description.strip(),
+        flags=re.IGNORECASE
+    )
+
+    weekday_map = {
+        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+        "friday": 4, "saturday": 5, "sunday": 6
+    }
+
+    tasks = []
+    for part in raw_parts:
+        chunk = part.strip().rstrip(".")
+        if not chunk:
+            continue
+
+        # Strip conversational prefixes like "I have an", "I need to", "also"
+        cleaned_name = re.sub(
+            r"^(?:also\s+)?(?:i\s+have\s+to\s+|i\s+need\s+to\s+|i\s+must\s+|i've\s+got\s+to\s+|i\s+have\s+(?:an?\s+)?|need\s+to\s+|have\s+to\s+)",
+            "",
+            chunk,
+            flags=re.IGNORECASE
+        ).strip()
+
+        if not cleaned_name:
+            continue
+
+        lower = cleaned_name.lower()
+        due_date = None
+        deadline_str = "Not specified"
+
+        if "today" in lower or "tonight" in lower:
+            due_date = today
+            deadline_str = "Today"
+        elif "day after tomorrow" in lower:
+            due_date = today + dt.timedelta(days=2)
+            deadline_str = due_date.strftime("%d %b %Y")
+        elif "tomorrow" in lower or "tmrw" in lower:
+            due_date = today + dt.timedelta(days=1)
+            deadline_str = "Tomorrow"
+        elif "next week" in lower:
+            due_date = today + dt.timedelta(days=7)
+            deadline_str = "Next week"
+        else:
+            iso_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", lower)
+            if iso_match:
+                try:
+                    due_date = dt.date.fromisoformat(iso_match.group(1))
+                    deadline_str = due_date.strftime("%d %b %Y")
+                except ValueError:
+                    pass
+            else:
+                in_days = re.search(r"\bin\s+(\d+)\s+days?\b", lower)
+                if in_days:
+                    days_num = int(in_days.group(1))
+                    due_date = today + dt.timedelta(days=days_num)
+                    deadline_str = f"In {days_num} days"
+                else:
+                    for day_name, day_idx in weekday_map.items():
+                        if re.search(rf"\b{day_name}\b", lower):
+                            days_ahead = (day_idx - today.weekday()) % 7
+                            if days_ahead == 0:
+                                days_ahead = 7
+                            due_date = today + dt.timedelta(days=days_ahead)
+                            deadline_str = day_name.title()
+                            break
+
+        # Priority heuristics
+        if any(w in lower for w in [
+            "urgent", "asap", "exam", "test", "assignment", "deadline",
+            "important", "final", "interview", "submit", "presentation", "today", "tomorrow"
+        ]):
+            priority = "High"
+        elif any(w in lower for w in [
+            "clean", "room", "later", "someday", "optional", "maybe",
+            "organize", "read", "watch", "laundry", "groceries"
+        ]):
+            priority = "Low"
+        else:
+            priority = "Medium"
+
+        # Capitalize first letter cleanly
+        task_title = cleaned_name[0].upper() + cleaned_name[1:]
+
+        tasks.append({
+            "task": task_title,
+            "priority": priority,
+            "deadline": deadline_str,
+            "due_date": due_date,
+            "project": "General",
+            "reminder_date": due_date,
+            "reminder_time": dt.time(9, 0),
+            "completed": False
+        })
+
+    return tasks
+
+
 def organize_tasks(description):
     api_key = get_openrouter_api_key()
     if not api_key:
-        raise RuntimeError(
-            "Missing OPENROUTER_API_KEY. Add it to .streamlit/secrets.toml "
-            "or set it as an environment variable."
-        )
+        return parse_tasks_locally(description)
 
     today = dt.date.today().isoformat()
 
@@ -205,45 +304,46 @@ User description:
 {description}
 """
 
-    response = requests.post(
-        OPENROUTER_URL,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": MODEL,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.2
-        },
-        timeout=60
-    )
-
-    if not response.ok:
-        raise RuntimeError(
-            f"OpenRouter HTTP {response.status_code}: "
-            f"{response.text[:400]}"
+    try:
+        response = requests.post(
+            OPENROUTER_URL,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2
+            },
+            timeout=30
         )
 
-    payload = response.json()
-    choices = payload.get("choices") or []
-    if not choices or "message" not in choices[0]:
-        raise RuntimeError("Unexpected response format from OpenRouter.")
+        if not response.ok:
+            return parse_tasks_locally(description)
 
-    content = (choices[0]["message"].get("content") or "").strip()
-    content = re.sub(r"^```(?:json)?\s*", "", content)
-    content = re.sub(r"\s*```$", "", content)
+        payload = response.json()
+        choices = payload.get("choices") or []
+        if not choices or "message" not in choices[0]:
+            return parse_tasks_locally(description)
 
-    try:
-        result = json.loads(content)
-    except json.JSONDecodeError:
-        match = re.search(r"\[.*\]", content, flags=re.DOTALL)
-        if not match:
-            raise ValueError("Could not parse JSON task list from AI response.")
-        result = json.loads(match.group(0))
+        content = (choices[0]["message"].get("content") or "").strip()
+        content = re.sub(r"^```(?:json)?\s*", "", content)
+        content = re.sub(r"\s*```$", "", content)
 
-    if not isinstance(result, list):
-        raise ValueError("The AI response was not a list.")
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError:
+            match = re.search(r"\[.*\]", content, flags=re.DOTALL)
+            if not match:
+                return parse_tasks_locally(description)
+            result = json.loads(match.group(0))
+
+        if not isinstance(result, list):
+            return parse_tasks_locally(description)
+
+    except Exception:
+        return parse_tasks_locally(description)
 
     cleaned = []
 
@@ -280,7 +380,7 @@ User description:
             "completed": False
         })
 
-    return cleaned
+    return cleaned or parse_tasks_locally(description)
 
 
 # ---------------- HEADER ----------------
